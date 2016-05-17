@@ -51,14 +51,13 @@ def temperatureHandler(evt) {
 def dataDump(evt) {
     log.debug "tempData: $state.tempData"
     // TODO: replace home1 with ID for this home
-    // TODO: figure out why only 1 data value is arriving
     
     // format data
     def params = [
     uri: "http://nestsense.banatao.berkeley.edu:8080",
         body: [
         	loc  : "home1",
-            value: state.tempData
+            value: "$state.tempData"
         ]
     ]
     
@@ -81,6 +80,6 @@ def setup() {
     
     // schedule data dump at 3AM daily
     // test with http://www.cronmaker.com/
-    //schedule("0 52 17 1/1 * ? *", dataDump)
-	schedule("0 0 3 1/1 * ? *", dataDump)
+    schedule("0 52 17 1/1 * ? *", dataDump)
+	//schedule("0 0 3 1/1 * ? *", dataDump)
 }
