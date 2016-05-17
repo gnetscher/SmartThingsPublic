@@ -29,6 +29,7 @@ preferences {
 	}
 	section("Monitor the shower") {
 		input "showerTemperatureSensor", "capability.temperatureMeasurement", required: true, title: "Where?"
+		input "showerHumiditySensor", "capability.relativeHumidityMeasurement", required: true, title: "Where?"
 	}
 }
 
@@ -41,36 +42,38 @@ def updated() {
 	setup()
 }
 
-// TODO: add other sensors: shower_humidity, carbon monoxide, faucets
+// TODO: add other sensors: carbon monoxide, faucets
 // TODO: add proper processing on the server
 
-def temperatureHandler(evt) {
-    // maintain running list of temperature updates
-    log.debug "$evt.displayName"
-    def tempEntry = [now(), evt.value]
-    log.debug "new temp data: $tempEntry"
+def newDataHandler(evt) {
+    // maintain running list of data updates
+    def data = evt.description.split(':')
+    def type = data[0]
+    def value= data[1]
+    
+    def entry = [now(), value]
+    log.debug "$evt.description" << " from " << "$evt.displayName" << " on " << "$evt.date"
 
-	if (evt.displayName == "stoveTemperatureSensor") {
-    	state.stoveTempData << tempEntry
-    } else if (evt.displayName == "showerTemperatureSensor") {
-    	state.showerTempData << tempEntry
+    if (type == "temperature") {
+        if (evt.displayName == "stoveTemperatureSensor") {
+            state.stoveTempData << entry
+        } else if (evt.displayName == "showerTemperatureSensor") {
+            state.showerTempData << entry
+        }
+    } else if (type == "humidity") {
+    	state.showerHumidData << entry
     }
 }
 
-def humidityHandler(evt) {}
-
 def dataDump(evt) {
-    log.debug "stoveTempData: $state.stoveTempData"
-    log.debug "showerTempData: $state.showerTempData"
-    // TODO: replace home1 with ID for this home
-    
     // format data
     def params = [
     uri: "http://nestsense.banatao.berkeley.edu:8080",
         body: [
-        	loc         : "$location.name",
-            stove_temp  : "$state.stoveTempData",
-            shower_temp : "$state.showerTempData"
+        	location           : "$location.name",
+            stove_temperature  : "$state.stoveTempData",
+            shower_temperature : "$state.showerTempData",
+            shower_humidity    : "$state.showerHumidData"
         ]
     ]
     
@@ -86,10 +89,12 @@ def dataDump(evt) {
 }
 
 def setup() {
-	// run temperatureHandler whenever temperature changes
-	subscribe(stoveTemperatureSensor, "temperature", temperatureHandler)
-	subscribe(showerTemperatureSensor, "temperature", temperatureHandler)
-    // maintain tempData list accross instances
+	// run handler whenever data changes
+	subscribe(stoveTemperatureSensor, "temperature", newDataHandler)
+	subscribe(showerTemperatureSensor, "temperature", newDataHandler)
+    subscribe(showerHumiditySensor, "humidity", newDataHandler)
+    
+    // maintain data lists accross instances
     state.stoveTempData = []
     state.showerTempData = []
     state.showerHumidData = []    
