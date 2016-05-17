@@ -24,8 +24,11 @@ definition(
     iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
 
 preferences {
-	section("Monitor the temperature...") {
-		input "temperatureSensor1", "capability.temperatureMeasurement"
+	section("Monitor the stove") {
+		input "stoveTemperatureSensor", "capability.temperatureMeasurement", required: true, title: "Where?"
+	}
+	section("Monitor the shower") {
+		input "showerTemperatureSensor", "capability.temperatureMeasurement", required: true, title: "Where?"
 	}
 }
 
@@ -38,26 +41,36 @@ def updated() {
 	setup()
 }
 
-// TODO: add other sensors
+// TODO: add other sensors: shower_humidity, carbon monoxide, faucets
 // TODO: add proper processing on the server
 
 def temperatureHandler(evt) {
     // maintain running list of temperature updates
+    log.debug "$evt.displayName"
     def tempEntry = [now(), evt.value]
-    state.tempData << tempEntry
-    log.debug "tempData: $state.tempData"
+    log.debug "new temp data: $tempEntry"
+
+	if (evt.displayName == "stoveTemperatureSensor") {
+    	state.stoveTempData << tempEntry
+    } else if (evt.displayName == "showerTemperatureSensor") {
+    	state.showerTempData << tempEntry
+    }
 }
 
+def humidityHandler(evt) {}
+
 def dataDump(evt) {
-    log.debug "tempData: $state.tempData"
+    log.debug "stoveTempData: $state.stoveTempData"
+    log.debug "showerTempData: $state.showerTempData"
     // TODO: replace home1 with ID for this home
     
     // format data
     def params = [
     uri: "http://nestsense.banatao.berkeley.edu:8080",
         body: [
-        	loc  : "home1",
-            value: "$state.tempData"
+        	loc         : "$location.name",
+            stove_temp  : "$state.stoveTempData",
+            shower_temp : "$state.showerTempData"
         ]
     ]
     
@@ -74,12 +87,14 @@ def dataDump(evt) {
 
 def setup() {
 	// run temperatureHandler whenever temperature changes
-	subscribe(temperatureSensor1, "temperature", temperatureHandler)
+	subscribe(stoveTemperatureSensor, "temperature", temperatureHandler)
+	subscribe(showerTemperatureSensor, "temperature", temperatureHandler)
     // maintain tempData list accross instances
-    state.tempData = []
+    state.stoveTempData = []
+    state.showerTempData = []
+    state.showerHumidData = []    
     
     // schedule data dump at 3AM daily
     // test with http://www.cronmaker.com/
-    schedule("0 52 17 1/1 * ? *", dataDump)
-	//schedule("0 0 3 1/1 * ? *", dataDump)
+	schedule("0 0 3 1/1 * ? *", dataDump)
 }
