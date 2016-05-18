@@ -64,33 +64,42 @@ def dataDump(evt) {
     
     // post data to server
     try {
-    	httpPost(params) { resp ->
+    	httpPostJson(params) { resp ->
         log.debug "response data: ${resp.data}"
         log.debug "response contentType: ${resp.contentType}"
     	}
     } catch (e) {
         log.debug "something went wrong: $e"
     }
+    
+	setUpDataMap()
 }
 
-def setup() {
-	// keep all data in dataMap
-    state.dataMap = [location: "$location.name"]	
-    def sensorAttributeMap = [(stoveTemperatureSensor)	: "temperature", 
+def setUpDataMap() {
+	// keep all sensors in sensorAttributeMap
+    state.sensorAttributeMap = [(stoveTemperatureSensor)	: "temperature", 
     					 	  (showerTemperatureSensor)	: "temperature",
                           	  (showerHumiditySensor)	: "humidity",
                        	      //(stoveCOSensor)				: "carbonMonoxide",
                           	  (overflowSensor)			: "water"]
-	
-    sensorAttributeMap.each { entry -> 
-    	// run handler whenever data changes
-    	subscribe(entry.key, entry.value, newDataHandler)
+
+    // keep all data in dataMap
+    state.dataMap = [location: "$location.name"]	
+    state.sensorAttributeMap.each { entry -> 
         // maintain data lists accross instances
         for (name in entry.key.displayName) {
 	        state.dataMap[name] = []
         }
     }
-    log.debug state.dataMap
+}
+
+def setup() {
+    setUpDataMap()
+
+    // run handler whenever data changes
+    state.sensorAttributeMap.each { entry -> 
+    	subscribe(entry.key, entry.value, newDataHandler)
+    }   
    
     // schedule data dump at 3AM daily
     // test with http://www.cronmaker.com/
