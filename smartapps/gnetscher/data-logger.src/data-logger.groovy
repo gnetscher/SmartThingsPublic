@@ -24,13 +24,19 @@ definition(
     iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
 
 preferences {
-	section("Monitor the stove") {
-		input "stoveTemperatureSensor", "capability.temperatureMeasurement", required: true, title: "Where?"
-	}
-	section("Monitor the shower") {
-		input "showerTemperatureSensor", "capability.temperatureMeasurement", required: true, title: "Where?"
-		input "showerHumiditySensor", "capability.relativeHumidityMeasurement", required: true, title: "Where?"
-	}
+    section("Monitor the stove temperature") {
+        input "stoveTemperatureSensor", "capability.temperatureMeasurement", title: "Where?", multiple: true
+    }/*
+    section("Monitor gas from the stove") {
+    input "stoveCOSensor", "capability.carbonMonoxideDetector", title: "Where?", multiple: true
+    }*/
+    section("Monitor the shower") {
+        input "showerTemperatureSensor", "capability.temperatureMeasurement", title: "Where?", multiple: true
+        input "showerHumiditySensor", "capability.relativeHumidityMeasurement", title: "Where?", multiple: true
+    }
+    section("Monitor water overflow") {
+        input "overflowSensor", "capability.waterSensor", title: "Where?", multiple: true
+    }
 }
 
 def installed() {
@@ -42,7 +48,8 @@ def updated() {
 	setup()
 }
 
-// TODO: add other sensors: carbon monoxide, faucets
+// TODO: handle that multiple sensors are possible: 
+// http://docs.smartthings.com/en/latest/smartapp-developers-guide/devices.html#interacting-with-multiple-devices
 // TODO: add proper processing on the server
 
 def newDataHandler(evt) {
@@ -62,7 +69,11 @@ def newDataHandler(evt) {
         }
     } else if (type == "humidity") {
     	state.showerHumidData << entry
-    }
+    } else if (type == "carbonMonoxide") {
+    	state.stoveCOData << entry
+    } else if (type == "water") {
+    	
+    } 
 }
 
 def dataDump(evt) {
@@ -70,10 +81,11 @@ def dataDump(evt) {
     def params = [
     uri: "http://nestsense.banatao.berkeley.edu:8080",
         body: [
-        	location           : "$location.name",
-            stove_temperature  : "$state.stoveTempData",
-            shower_temperature : "$state.showerTempData",
-            shower_humidity    : "$state.showerHumidData"
+        	location             : "$location.name",
+            stove_temperature    : "$state.stoveTempData",
+            shower_temperature   : "$state.showerTempData",
+            shower_humidity      : "$state.showerHumidData",
+            //stove_carbonMonoxide : "$state.stoveCOData"
         ]
     ]
     
@@ -93,12 +105,16 @@ def setup() {
 	subscribe(stoveTemperatureSensor, "temperature", newDataHandler)
 	subscribe(showerTemperatureSensor, "temperature", newDataHandler)
     subscribe(showerHumiditySensor, "humidity", newDataHandler)
+    //subscribe(stoveCOSensor, "carbonMonoxide", newDataHandler)
+    subscribe(overflowSensor, "water", newDataHandler)
     
     // maintain data lists accross instances
     state.stoveTempData = []
     state.showerTempData = []
-    state.showerHumidData = []    
-    
+    state.showerHumidData = []  
+    state.stoveCOData = []
+    state.overflowData = [] 
+   
     // schedule data dump at 3AM daily
     // test with http://www.cronmaker.com/
 	schedule("0 0 3 1/1 * ? *", dataDump)
