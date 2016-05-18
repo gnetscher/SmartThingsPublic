@@ -48,45 +48,18 @@ def updated() {
 	setup()
 }
 
-// TODO: handle that multiple sensors are possible: 
-// http://docs.smartthings.com/en/latest/smartapp-developers-guide/devices.html#interacting-with-multiple-devices
-// TODO: add proper processing on the server
-
 def newDataHandler(evt) {
-    // maintain running list of data updates
-    def data = evt.description.split(':')
-    def type = data[0]
-    def value= data[1]
-    
-    def entry = [now(), value]
-    log.debug "$evt.description" << " from " << "$evt.displayName" << " on " << "$evt.date"
-
-    if (type == "temperature") {
-        if (evt.displayName == "stoveTemperatureSensor") {
-            state.stoveTempData << entry
-        } else if (evt.displayName == "showerTemperatureSensor") {
-            state.showerTempData << entry
-        }
-    } else if (type == "humidity") {
-    	state.showerHumidData << entry
-    } else if (type == "carbonMonoxide") {
-    	state.stoveCOData << entry
-    } else if (type == "water") {
-    	
-    } 
+    // maintain running list of data updates    
+    def entry = [now(), evt.value]   
+    state.dataMap[evt.displayName] << entry
+    log.debug "$state.dataMap"
 }
 
 def dataDump(evt) {
     // format data
     def params = [
-    uri: "http://nestsense.banatao.berkeley.edu:8080",
-        body: [
-        	location             : "$location.name",
-            stove_temperature    : "$state.stoveTempData",
-            shower_temperature   : "$state.showerTempData",
-            shower_humidity      : "$state.showerHumidData",
-            //stove_carbonMonoxide : "$state.stoveCOData"
-        ]
+	    uri: "http://nestsense.banatao.berkeley.edu:8080",
+        body: state.dataMap
     ]
     
     // post data to server
@@ -101,19 +74,23 @@ def dataDump(evt) {
 }
 
 def setup() {
-	// run handler whenever data changes
-	subscribe(stoveTemperatureSensor, "temperature", newDataHandler)
-	subscribe(showerTemperatureSensor, "temperature", newDataHandler)
-    subscribe(showerHumiditySensor, "humidity", newDataHandler)
-    //subscribe(stoveCOSensor, "carbonMonoxide", newDataHandler)
-    subscribe(overflowSensor, "water", newDataHandler)
-    
-    // maintain data lists accross instances
-    state.stoveTempData = []
-    state.showerTempData = []
-    state.showerHumidData = []  
-    state.stoveCOData = []
-    state.overflowData = [] 
+	// keep all data in dataMap
+    state.dataMap = [location: "$location.name"]	
+    def sensorAttributeMap = [(stoveTemperatureSensor)	: "temperature", 
+    					 	  (showerTemperatureSensor)	: "temperature",
+                          	  (showerHumiditySensor)	: "humidity",
+                       	      //(stoveCOSensor)				: "carbonMonoxide",
+                          	  (overflowSensor)			: "water"]
+	
+    sensorAttributeMap.each { entry -> 
+    	// run handler whenever data changes
+    	subscribe(entry.key, entry.value, newDataHandler)
+        // maintain data lists accross instances
+        for (name in entry.key.displayName) {
+	        state.dataMap[name] = []
+        }
+    }
+    log.debug state.dataMap
    
     // schedule data dump at 3AM daily
     // test with http://www.cronmaker.com/
