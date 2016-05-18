@@ -25,17 +25,17 @@ definition(
 
 preferences {
     section("Monitor the stove temperature") {
-        input "stoveTemperatureSensor", "capability.temperatureMeasurement", title: "Where?", multiple: true
-    }/*
+        input "stoveTemperatureSensor", "capability.temperatureMeasurement", title: "Temperature?", multiple: true
+    }
     section("Monitor gas from the stove") {
-    input "stoveCOSensor", "capability.carbonMonoxideDetector", title: "Where?", multiple: true
-    }*/
+    input "stoveCOSensor", "capability.carbonMonoxideDetector", title: "CO?", multiple: true
+    }
     section("Monitor the shower") {
-        input "showerTemperatureSensor", "capability.temperatureMeasurement", title: "Where?", multiple: true
-        input "showerHumiditySensor", "capability.relativeHumidityMeasurement", title: "Where?", multiple: true
+        input "showerTemperatureSensor", "capability.temperatureMeasurement", title: "Temperature?", multiple: true
+        input "showerHumiditySensor", "capability.relativeHumidityMeasurement", title: "Humidity?", multiple: true
     }
     section("Monitor water overflow") {
-        input "overflowSensor", "capability.waterSensor", title: "Where?", multiple: true
+        input "overflowSensor", "capability.waterSensor", title: "Water?", multiple: true
     }
 }
 
@@ -56,6 +56,9 @@ def newDataHandler(evt) {
 }
 
 def dataDump(evt) {
+	// notify that cron is executing
+    sendPush("Cron executing")
+
     // format data
     def params = [
 	    uri: "http://nestsense.banatao.berkeley.edu:8080",
@@ -72,16 +75,17 @@ def dataDump(evt) {
         log.debug "something went wrong: $e"
     }
     
+    // clean up
 	setUpDataMap()
 }
 
 def setUpDataMap() {
 	// keep all sensors in sensorAttributeMap
-    state.sensorAttributeMap = [(stoveTemperatureSensor)	: "temperature", 
-    					 	  (showerTemperatureSensor)	: "temperature",
-                          	  (showerHumiditySensor)	: "humidity",
-                       	      //(stoveCOSensor)				: "carbonMonoxide",
-                          	  (overflowSensor)			: "water"]
+    state.sensorAttributeMap = [(stoveTemperatureSensor): "temperature", 
+    					 	   (showerTemperatureSensor): "temperature",
+                          	   (showerHumiditySensor)	: "humidity",
+                       	       (stoveCOSensor)			: "carbonMonoxide",
+                          	   (overflowSensor)			: "water"]
 
     // keep all data in dataMap
     state.dataMap = [location: "$location.name"]	
