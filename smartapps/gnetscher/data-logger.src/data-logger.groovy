@@ -25,17 +25,20 @@ definition(
 
 preferences {
     section("Monitor the stove temperature") {
-        input "stoveTemperatureSensor", "capability.temperatureMeasurement", title: "Temperature?", multiple: true
+        input "stoveTHSensor", "capability.temperatureMeasurement", title: "Stove sensor?", 
+        	  multiple: true, required: false
     }
     section("Monitor gas from the stove") {
-    input "stoveCOSensor", "capability.carbonMonoxideDetector", title: "CO?", multiple: true
+    	input "stoveCOSensor", "capability.carbonMonoxideDetector", title: "CO?", 
+        	  multiple: true, required: false
     }
     section("Monitor the shower") {
-        input "showerTemperatureSensor", "capability.temperatureMeasurement", title: "Temperature?", multiple: true
-        input "showerHumiditySensor", "capability.relativeHumidityMeasurement", title: "Humidity?", multiple: true
+        input "showerTHSensor", "capability.temperatureMeasurement", title: "Shower sensor?", 
+	          multiple: true, required: false
     }
     section("Monitor water overflow") {
-        input "overflowSensor", "capability.waterSensor", title: "Water?", multiple: true
+        input "overflowSensor", "capability.waterSensor", title: "Water sensor?", 
+        	  multiple: true, required: false
     }
 }
 
@@ -49,9 +52,14 @@ def updated() {
 }
 
 def newDataHandler(evt) {
-    // maintain running list of data updates    
+    // maintain running list of data updates 
+    def att = evt.description.split(':')[0]
     def entry = [now(), evt.value]   
-    state.dataMap[evt.displayName] << entry
+	try {
+	    state.dataMap["$location.name"]["$evt.displayName"]["$att"] << entry
+    } catch (e) {
+    	state.dataMap["$location.name"]["$evt.displayName"]["$att"] = entry
+    }
     log.debug "$state.dataMap"
 }
 
@@ -80,21 +88,44 @@ def dataDump(evt) {
 }
 
 def setUpDataMap() {
-	// keep all sensors in sensorAttributeMap
-    state.sensorAttributeMap = [(stoveTemperatureSensor): "temperature", 
-    					 	   (showerTemperatureSensor): "temperature",
-                          	   (showerHumiditySensor)	: "humidity",
-                       	       (stoveCOSensor)			: "carbonMonoxide",
-                          	   (overflowSensor)			: "water"]
-
-    // keep all data in dataMap
-    state.dataMap = [location: "$location.name"]	
-    state.sensorAttributeMap.each { entry -> 
-        // maintain data lists accross instances
-        for (name in entry.key.displayName) {
-	        state.dataMap[name] = []
+	// prepare active sensors in sensorAttributeMap
+    state.sensorAttributeMap = [(stoveTHSensor)	: ["temperature"], 
+    					 	   (showerTHSensor)	: ["temperature", "humidity"],
+                       	       (stoveCOSensor)	: ["carbonMonoxide"],
+                          	   (overflowSensor)	: ["water"]]
+	def tempMap = [:]
+    state.sensorAttributeMap.each { entry ->
+    	if (entry.key != null) {
+        	tempMap[entry.key] = entry.value
         }
     }
+    state.sensorAttributeMap = tempMap
+    log.debug state.sensorAttributeMap
+                    
+    /** keep all data in dataMap with structure:
+    *	 	location
+    *		-->	sensor
+    *			-->	attribute
+    *				--> data
+    */
+    state.dataMap = [:]	    
+    state.sensorAttributeMap.each { entry -> 
+        for (name in entry.key.displayName) { 
+            log.debug state.dataMap
+            def attMap = [:]
+            for (att in entry.value) {
+                attMap["$att"] = []
+            }
+            try {
+                state.dataMap["$location.name"] << ["$name": attMap]
+            } catch (e) {
+            	log.debug "$e"
+                state.dataMap["$location.name"] = ["$name": attMap]
+            }
+        }
+    }
+    log.debug state.dataMap
+
 }
 
 def setup() {
@@ -102,10 +133,12 @@ def setup() {
 
     // run handler whenever data changes
     state.sensorAttributeMap.each { entry -> 
-    	subscribe(entry.key, entry.value, newDataHandler)
+        for (att in entry.value) {
+            subscribe(entry.key, att, newDataHandler)
+        }
     }   
    
-    // schedule data dump at 3AM daily
+    // schedule data dump at 2AM daily
     // test with http://www.cronmaker.com/
-	schedule("0 0 3 1/1 * ? *", dataDump)
+	schedule("0 0 9 1/1 * ? *", dataDump)
 }
