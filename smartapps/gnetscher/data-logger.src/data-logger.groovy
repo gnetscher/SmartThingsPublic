@@ -25,19 +25,19 @@ definition(
 
 preferences {
     section("Monitor the stove temperature") {
-        input "stoveTHSensor", "capability.temperatureMeasurement", title: "Stove sensor?", 
+        input "Kitchen_Stove_0", "capability.temperatureMeasurement", title: "Stove sensor?", 
         	  multiple: true, required: false
     }
     section("Monitor gas from the stove") {
-    	input "stoveCOSensor", "capability.carbonMonoxideDetector", title: "CO?", 
+    	input "Kitchen_Stove_1", "capability.carbonMonoxideDetector", title: "CO?", 
         	  multiple: true, required: false
     }
     section("Monitor the shower") {
-        input "showerTHSensor", "capability.temperatureMeasurement", title: "Shower sensor?", 
+        input "Bathroom_Shower_0", "capability.temperatureMeasurement", title: "Shower sensor?", 
 	          multiple: true, required: false
     }
     section("Monitor water overflow") {
-        input "overflowSensor", "capability.waterSensor", title: "Water sensor?", 
+        input "Bathroom_Sink_0", "capability.waterSensor", title: "Water sensor?", 
         	  multiple: true, required: false
     }
 }
@@ -56,9 +56,9 @@ def newDataHandler(evt) {
     def att = evt.description.split(':')[0]
     def entry = [now(), evt.value]   
 	try {
-	    state.dataMap["$location.name"]["$evt.displayName"]["$att"] << entry
+	    state.dataMap["data"]["$evt.displayName"]["$att"] << entry
     } catch (e) {
-    	state.dataMap["$location.name"]["$evt.displayName"]["$att"] = entry
+    	state.dataMap["data"]["$evt.displayName"]["$att"] = entry
     }
     log.debug "$state.dataMap"
 }
@@ -69,7 +69,7 @@ def dataDump(evt) {
 
     // format data
     def params = [
-	    uri: "http://nestsense.banatao.berkeley.edu:8080",
+	    uri: "http://nestsense.banatao.berkeley.edu:9000/master/upload_sensors_data",
         body: state.dataMap
     ]
     
@@ -89,10 +89,10 @@ def dataDump(evt) {
 
 def setUpDataMap() {
 	// prepare active sensors in sensorAttributeMap
-    state.sensorAttributeMap = [(stoveTHSensor)	: ["temperature"], 
-    					 	   (showerTHSensor)	: ["temperature", "humidity"],
-                       	       (stoveCOSensor)	: ["carbonMonoxide"],
-                          	   (overflowSensor)	: ["water"]]
+    state.sensorAttributeMap = [(Kitchen_Stove_0)	: ["temperature"], 
+    					 	   (Bathroom_Shower_0)	: ["temperature", "humidity"],
+                       	       (Kitchen_Stove_1)	: ["carbonMonoxide"],
+                          	   (Bathroom_Sink_0)	: ["water"]]
 	def tempMap = [:]
     state.sensorAttributeMap.each { entry ->
     	if (entry.key != null) {
@@ -103,12 +103,17 @@ def setUpDataMap() {
     log.debug state.sensorAttributeMap
                     
     /** keep all data in dataMap with structure:
-    *	 	location
+	*		config
+    *		--> homeID
+    *		--> timezone
+	*	 	data
     *		-->	sensor
     *			-->	attribute
-    *				--> data
+    *				--> entries
     */
-    state.dataMap = [:]	    
+    def timezone = Calendar.getInstance().getTimeZone().getID()
+    state.dataMap = ["config": ["homeID": "$location.name", "timezone": timezone],
+    				 "data": [:]]
     state.sensorAttributeMap.each { entry -> 
         for (name in entry.key.displayName) { 
             log.debug state.dataMap
@@ -116,12 +121,7 @@ def setUpDataMap() {
             for (att in entry.value) {
                 attMap["$att"] = []
             }
-            try {
-                state.dataMap["$location.name"] << ["$name": attMap]
-            } catch (e) {
-            	log.debug "$e"
-                state.dataMap["$location.name"] = ["$name": attMap]
-            }
+            state.dataMap["data"] << ["$name": attMap]
         }
     }
     log.debug state.dataMap
@@ -140,5 +140,5 @@ def setup() {
    
     // schedule data dump at 2AM daily
     // test with http://www.cronmaker.com/
-	schedule("0 0 9 1/1 * ? *", dataDump)
+	schedule("0 0 2 1/1 * ? *", dataDump)
 }
