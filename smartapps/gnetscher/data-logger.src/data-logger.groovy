@@ -69,7 +69,7 @@ def dataDump(evt) {
 
     // format data
     def params = [
-	    uri: "http://nestsense.banatao.berkeley.edu:9000/master/upload_sensors_data",
+	    uri: "http://nestsense.banatao.berkeley.edu:9000/upload_sensors_data",
         body: state.dataMap
     ]
     
@@ -112,7 +112,7 @@ def setUpDataMap() {
     *				--> entries
     */
     def timezone = Calendar.getInstance().getTimeZone().getID()
-    state.dataMap = ["config": ["homeID": "$location.name", "timezone": timezone],
+    state.dataMap = ["config": ["home_id": "$location.name", "timezone": timezone],
     				 "data": [:]]
     state.sensorAttributeMap.each { entry -> 
         for (name in entry.key.displayName) { 
@@ -138,7 +138,7 @@ def setup() {
         }
     }   
    
-    // schedule data dump at 2AM daily
+    // schedule data dump at 2AM daily (9 below is for UTC-0)
     // test with http://www.cronmaker.com/
-	schedule("0 0 2 1/1 * ? *", dataDump)
+	schedule("0 0 9 1/1 * ? *", dataDump)
 }
